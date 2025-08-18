@@ -209,3 +209,101 @@ func TestWriteFile(t *testing.T) {
 		})
 	}
 }
+
+func TestMarshal(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    any
+		expected []byte
+		err      string
+	}{
+		{
+			name:     "valid records",
+			input:    [][]string{{"a", "b"}, {"1", "2"}},
+			expected: []byte("a,b\n1,2\n"),
+			err:      "",
+		},
+		{
+			name:     "empty records",
+			input:    [][]string{},
+			expected: nil,
+			err:      "records cannot be empty",
+		},
+		{
+			name:     "invalid type",
+			input:    "not a [][]string",
+			expected: nil,
+			err:      "data must be [][]string",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := csv.Marshal(tt.input)
+			if tt.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.err) {
+					t.Errorf("Marshal() error = %v, wantErr containing %q", err, tt.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Marshal() unexpected error = %v", err)
+			}
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("Marshal() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestUnmarshal(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+		dest any
+		want any
+		err  string
+	}{
+		{
+			name: "valid CSV",
+			data: []byte("a,b\n1,2\n"),
+			dest: &[][]string{},
+			want: &[][]string{{"a", "b"}, {"1", "2"}},
+			err:  "",
+		},
+		{
+			name: "empty data",
+			data: []byte{},
+			dest: &[][]string{},
+			err:  "CSV data cannot be empty",
+		},
+		{
+			name: "invalid dest type",
+			data: []byte("a,b\n1,2\n"),
+			dest: &struct{}{},
+			err:  "destination must be *[][]string",
+		},
+		{
+			name: "malformed CSV",
+			data: []byte("a,b\n1,\"2\n"),
+			dest: &[][]string{},
+			err:  "extraneous or missing \" in quoted-field",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := csv.Unmarshal(tt.data, tt.dest)
+			if tt.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.err) {
+					t.Errorf("Unmarshal() error = %v, wantErr containing %q", err, tt.err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unmarshal() unexpected error = %v", err)
+			}
+			if tt.want != nil && !reflect.DeepEqual(tt.dest, tt.want) {
+				t.Errorf("Unmarshal() dest = %v, want %v", tt.dest, tt.want)
+			}
+		})
+	}
+}
