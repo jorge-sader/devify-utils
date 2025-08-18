@@ -1,49 +1,69 @@
+// Package filesystem provides utilities for file and directory operations, MIME type detection, and filename sanitization.
+//
+// This package offers helper functions for managing files and directories, checking file existence,
+// appending content to files, creating files and directories, and sanitizing filenames for cross-platform compatibility.
+// It also includes functions for determining MIME types based on file extensions or content.
+// These utilities are designed to be used within the devify-utils library to support robust file operations.
 package filesystem
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"mime"
-	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
-
-	"github.com/go-playground/validator/v10"
 )
 
 // CaseStyle defines the style of the filename case.
+//
+// This type is reserved for future use in functions that may adjust filename case formatting
+// (e.g., camelCase, snake_case). Currently, it is unused in the package.
 type CaseStyle string
 
-// FileOperation holds configuration for file operations.
-type FileOperation struct {
-	MaxFileSize      int64
-	AllowedFileTypes []string
-	Validate         *validator.Validate
-}
-
-// UploadedFile represents metadata for an uploaded file.
-type UploadedFile struct {
-	OriginalName string `validate:"required"`
-	EncodedName  string `validate:"required"`
-	FullPath     string `validate:"required"`
-	FileMimeType string `validate:"required,allowedfiletype"`
-	Extension    string `validate:"required"`
-	FileSize     int64  `validate:"gte=0"`
-}
-
-// FileExists checks if a file exists using os.Stat.
+// FileExists checks if a file or directory exists at the specified path.
+//
+// The function uses os.Stat to determine if the path exists, returning true if it does and false otherwise.
+// It does not distinguish between files and directories.
+//
+// Example:
+//
+//	if FileExists("data.txt") {
+//	    fmt.Println("File or directory exists")
+//	} else {
+//	    fmt.Println("File or directory does not exist")
+//	}
+//
+// Parameters:
+//   - path: The file or directory path to check.
+//
+// Returns:
+//   - bool: True if the path exists, false otherwise.
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
-// AppendToFile appends content to a file.
+// AppendToFile appends content to a file at the specified path.
+//
+// If the file does not exist, it is created with permissions 0644. The function opens the file in append mode
+// and writes the provided content string. If any error occurs during file operations, it is returned.
+//
+// Example:
+//
+//	err := AppendToFile("log.txt", "Log entry\n")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// Parameters:
+//   - path: The file path to append content to.
+//   - content: The string content to append to the file.
+//
+// Returns:
+//   - error: An error if the file cannot be opened or written to.
 func AppendToFile(path, content string) error {
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -55,6 +75,24 @@ func AppendToFile(path, content string) error {
 }
 
 // CreateDirIfNotExist creates a directory at the specified path if it does not already exist.
+//
+// The function checks if the path is valid, not empty, and not too long (max 4096 characters).
+// If the path exists and is a directory, no action is taken. If it exists as a file, an error is returned.
+// Optional permissions can be provided; otherwise, the default permission is 0755.
+//
+// Example:
+//
+//	err := CreateDirIfNotExist("data/output", 0o755)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// Parameters:
+//   - path: The directory path to create.
+//   - perm: Optional directory permission mode (os.FileMode). Defaults to 0755 if not provided.
+//
+// Returns:
+//   - error: An error if the path is empty, too long, exists as a file, or directory creation fails.
 func CreateDirIfNotExist(path string, perm ...os.FileMode) error {
 	if path == "" || path == "." {
 		return errors.New("path cannot be empty or root")
@@ -80,6 +118,24 @@ func CreateDirIfNotExist(path string, perm ...os.FileMode) error {
 }
 
 // CreateFileIfNotExist creates a file at the specified path if it does not already exist.
+//
+// The function checks if the path is valid, not empty, and not too long (max 4096 characters).
+// If the path exists and is a file, no action is taken. If it exists as a directory, an error is returned.
+// Optional permissions can be provided; otherwise, the default permission is 0600.
+//
+// Example:
+//
+//	err := CreateFileIfNotExist("data.txt", 0o644)
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// Parameters:
+//   - path: The file path to create.
+//   - perm: Optional file permission mode (os.FileMode). Defaults to 0600 if not provided.
+//
+// Returns:
+//   - error: An error if the path is empty, too long, exists as a directory, or file creation fails.
 func CreateFileIfNotExist(path string, perm ...os.FileMode) error {
 	if path == "" || path == "." {
 		return errors.New("path cannot be empty or root")
@@ -109,6 +165,20 @@ func CreateFileIfNotExist(path string, perm ...os.FileMode) error {
 }
 
 // GetMimeTypeFromExtension returns the MIME type for a given file extension.
+//
+// If the extension does not start with a dot, it is added automatically. If no MIME type is found,
+// the default "application/octet-stream" is returned. This function uses the standard library's mime package.
+//
+// Example:
+//
+//	mimeType := GetMimeTypeFromExtension(".pdf")
+//	fmt.Println(mimeType) // Prints "application/pdf"
+//
+// Parameters:
+//   - ext: The file extension (e.g., ".pdf" or "pdf").
+//
+// Returns:
+//   - string: The MIME type for the extension, or "application/octet-stream" if unknown.
 func GetMimeTypeFromExtension(ext string) string {
 	if !strings.HasPrefix(ext, ".") {
 		ext = "." + ext
@@ -120,25 +190,53 @@ func GetMimeTypeFromExtension(ext string) string {
 	return mimeType
 }
 
-// GetMimeTypeFromContent is a placeholder for content-based MIME detection.
+// GetMimeTypeFromContent determines the MIME type of a file based on its content.
+//
+// This function is a placeholder for content-based MIME detection. It is currently unimplemented
+// and returns an empty string and nil error. Future implementations should read a portion of the file
+// (e.g., the first 512 bytes) to determine the MIME type.
+//
+// Parameters:
+//   - path: The file path to analyze.
+//
+// Returns:
+//   - string: The MIME type (currently unimplemented, returns empty string).
+//   - error: An error (currently unimplemented, returns nil).
 func GetMimeTypeFromContent(path string) (string, error) {
 	// TODO: Read first 512 characters and determine mime type
 	return "", nil
 }
 
-// SanitizeFilename sanitizes a filename by cleaning invalid characters, normalizing whitespace,
-// and ensuring the filename is safe for use across Linux, macOS, and Windows.
+// SanitizeFilename sanitizes a filename to ensure it is safe for use across Linux, macOS, and Windows.
+//
+// The function removes or replaces invalid characters, non-printable characters, and control characters,
+// trims leading/trailing spaces and dots, and checks for reserved filenames (e.g., "CON", "."). It also
+// ensures the filename length does not exceed 255 bytes, a common filesystem limit. If the filename is
+// empty or invalid after sanitization, an error is returned.
+//
+// Example:
+//
+//	safeName, err := SanitizeFilename("my<file>.txt")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(safeName) // Prints "my_file_.txt"
+//
+// Parameters:
+//   - filename: The filename to sanitize.
+//
+// Returns:
+//   - string: The sanitized filename.
+//   - error: An error if the filename is empty, a reserved name, or empty after sanitization.
 func SanitizeFilename(filename string) (string, error) {
 	if filename == "" {
 		return "", errors.New("filename cannot be empty")
 	}
-
 	// Replace invalid filename characters with an underscore
 	invalidChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
 	for _, char := range invalidChars {
 		filename = strings.ReplaceAll(filename, char, "_")
 	}
-
 	// Replace non-printable or control characters with an underscore
 	cleaned := strings.Map(func(r rune) rune {
 		if !unicode.IsPrint(r) || unicode.IsControl(r) {
@@ -146,10 +244,8 @@ func SanitizeFilename(filename string) (string, error) {
 		}
 		return r
 	}, filename)
-
 	// Trim leading/trailing spaces and dots
 	cleaned = strings.Trim(cleaned, " .")
-
 	// Check for reserved filenames
 	reservedNames := []string{
 		".", "..", // Linux/macOS reserved
@@ -161,12 +257,10 @@ func SanitizeFilename(filename string) (string, error) {
 	if slices.ContainsFunc(reservedNames, func(s string) bool { return strings.EqualFold(baseWithoutExt, s) }) {
 		return "", errors.New("filename is a reserved name: " + cleaned)
 	}
-
 	// Ensure the filename is not empty after cleaning
 	if cleaned == "" {
 		return "", errors.New("sanitized filename is empty")
 	}
-
 	// Limit filename length to 255 bytes (common filesystem limit)
 	if len(cleaned) > 255 {
 		ext := filepath.Ext(cleaned)
@@ -176,120 +270,28 @@ func SanitizeFilename(filename string) (string, error) {
 		}
 		cleaned = cleaned[:maxBaseLen] + ext
 	}
-
 	return cleaned, nil
 }
 
-// HasFileExtension checks if the component has a valid file extension.
+// HasFileExtension checks if the provided string has a valid file extension.
+//
+// A valid extension is a non-empty suffix starting with a dot (e.g., ".txt").
+// The function returns true if the string has an extension and false otherwise.
+//
+// Example:
+//
+//	if HasFileExtension("document.txt") {
+//	    fmt.Println("Has valid extension")
+//	} else {
+//	    fmt.Println("No valid extension")
+//	}
+//
+// Parameters:
+//   - comp: The string to check for a file extension.
+//
+// Returns:
+//   - bool: True if the string has a valid file extension, false otherwise.
 func HasFileExtension(comp string) bool {
 	ext := filepath.Ext(comp)
 	return ext != "" && ext != comp
-}
-
-// generateRandomHex generates a random hexadecimal string of n characters (n must be even).
-func generateRandomHex(n int) (string, error) {
-	if n%2 != 0 {
-		return "", fmt.Errorf("n must be even for hex encoding")
-	}
-	bytes := make([]byte, n/2)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
-}
-
-// UploadFiles handles uploading multiple files from an HTTP request.
-func (f *FileOperation) UploadFiles(r *http.Request, uploadDir string, rename bool) ([]UploadedFile, error) {
-	if err := CreateDirIfNotExist(uploadDir); err != nil {
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
-	}
-	if err := r.ParseMultipartForm(f.MaxFileSize << 20); err != nil {
-		return nil, fmt.Errorf("failed to parse multipart form: %w", err)
-	}
-	var uploadedFiles []UploadedFile
-	for _, fileHeaders := range r.MultipartForm.File {
-		for _, header := range fileHeaders {
-			uploadedFile, err := func() (*UploadedFile, error) {
-				file, err := header.Open()
-				if err != nil {
-					return nil, fmt.Errorf("failed to open file: %w", err)
-				}
-				defer file.Close()
-
-				if header.Filename == "" {
-					return nil, errors.New("filename cannot be empty")
-				}
-
-				if header.Size > f.MaxFileSize {
-					return nil, fmt.Errorf("file size %d exceeds maximum %d", header.Size, f.MaxFileSize)
-				}
-				sanitizedName, err := SanitizeFilename(header.Filename)
-				if err != nil {
-					return nil, fmt.Errorf("failed to sanitize filename: %w", err)
-				}
-				var encodedName string
-				if rename {
-					hexStr, err := generateRandomHex(32)
-					if err != nil {
-						return nil, fmt.Errorf("failed to generate random name: %w", err)
-					}
-					encodedName = hexStr + filepath.Ext(sanitizedName)
-				} else {
-					encodedName = sanitizedName
-				}
-				fullPath := filepath.Join(uploadDir, encodedName)
-				destFile, err := os.Create(fullPath)
-				if err != nil {
-					return nil, fmt.Errorf("failed to create destination file: %w", err)
-				}
-				defer destFile.Close()
-				_, err = io.Copy(destFile, file)
-				if err != nil {
-					return nil, fmt.Errorf("failed to write file: %w", err)
-				}
-				uploadedFile := UploadedFile{
-					OriginalName: header.Filename,
-					EncodedName:  encodedName,
-					FullPath:     fullPath,
-					FileMimeType: header.Header.Get("Content-Type"),
-					Extension:    filepath.Ext(encodedName),
-					FileSize:     header.Size,
-				}
-
-				if err := f.Validate.Struct(uploadedFile); err != nil {
-					return nil, fmt.Errorf("failed to validate uploaded file: %w", err)
-				}
-				return &uploadedFile, nil
-			}()
-			if err != nil {
-				return uploadedFiles, fmt.Errorf("failed to save uploaded file: %w", err)
-			}
-			uploadedFiles = append(uploadedFiles, *uploadedFile)
-		}
-	}
-
-	if len(uploadedFiles) == 0 {
-		return nil, errors.New("no files uploaded")
-	}
-	return uploadedFiles, nil
-}
-
-// UploadOneFile handles uploading a single file from an HTTP request.
-func (f *FileOperation) UploadOneFile(r *http.Request, uploadDir string, rename bool) (*UploadedFile, error) {
-	files, err := f.UploadFiles(r, uploadDir, rename)
-	if err != nil {
-		return nil, err
-	}
-	if len(files) != 1 {
-		return nil, fmt.Errorf("multiple files uploaded, expected one")
-	}
-	return &files[0], nil
-}
-
-// IsAllowedFileType is a custom validation function for checking against a []string
-func (f *FileOperation) IsAllowedFileType(fl validator.FieldLevel) bool {
-	// Get the field value
-	value := fl.Field().String()
-	// Check if the value exists in the AllowedFileTypes slice
-	return slices.Contains(f.AllowedFileTypes, value)
 }
