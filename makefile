@@ -1,5 +1,5 @@
 
-DIFF_OUTPUT ?= diff_output.txt
+DIFF_OUTPUT ?= tmp/diff_output.txt
 
 # Run all tests
 .PHONY: test
