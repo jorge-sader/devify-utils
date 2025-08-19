@@ -9,7 +9,9 @@ package filesystem
 import (
 	"errors"
 	"fmt"
+	"io"
 	"mime"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -191,20 +193,47 @@ func GetMimeTypeFromExtension(ext string) string {
 }
 
 // GetMimeTypeFromContent determines the MIME type of a file based on its content.
+// It reads the first 512 bytes of the file and uses http.DetectContentType to identify the MIME type.
+// If the file cannot be opened or read, an error is returned.
+// For empty files, it returns "application/octet-stream" with no error.
 //
-// This function is a placeholder for content-based MIME detection. It is currently unimplemented
-// and returns an empty string and nil error. Future implementations should read a portion of the file
-// (e.g., the first 512 bytes) to determine the MIME type.
+// Example:
+// mimeType, err := GetMimeTypeFromContent("image.png")
+//
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//
+// fmt.Println(mimeType) // Prints "image/png"
 //
 // Parameters:
-//   - path: The file path to analyze.
+// - path: The file path to analyze.
 //
 // Returns:
-//   - string: The MIME type (currently unimplemented, returns empty string).
-//   - error: An error (currently unimplemented, returns nil).
+// - string: The detected MIME type (e.g., "image/png", "text/plain; charset=utf-8").
+// - error: An error if the file cannot be opened or read.
 func GetMimeTypeFromContent(path string) (string, error) {
-	// TODO: Read first 512 characters and determine mime type
-	return "", nil
+	if path == "" || path == "." {
+		return "", errors.New("path cannot be empty or root")
+	}
+	if len(path) > 4096 {
+		return "", errors.New("path too long")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	buffer := make([]byte, 512)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	if n == 0 {
+		return "application/octet-stream", nil
+	}
+	mimeType := http.DetectContentType(buffer[:n])
+	return mimeType, nil
 }
 
 // SanitizeFilename sanitizes a filename to ensure it is safe for use across Linux, macOS, and Windows.

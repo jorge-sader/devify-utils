@@ -261,9 +261,89 @@ func TestGetMimeTypeFromExtension(t *testing.T) {
 }
 
 func TestGetMimeTypeFromContent(t *testing.T) {
-	// TODO: Implement when function is completed
-	if got, err := filesystem.GetMimeTypeFromContent("dummy"); got != "" || err != nil {
-		t.Errorf("GetMimeTypeFromContent() = %v, err = %v; want \"\", nil", got, err)
+	tempDir := t.TempDir()
+	textPath := filepath.Join(tempDir, "text.txt")
+	imagePath := filepath.Join(tempDir, "image.png")
+	pdfPath := filepath.Join(tempDir, "document.pdf")
+	emptyPath := filepath.Join(tempDir, "empty.txt")
+	nonexistentPath := filepath.Join(tempDir, "nonexistent.txt")
+	longPath := filepath.Join(tempDir, string(make([]rune, 4097)))
+
+	// Setup test files
+	os.WriteFile(textPath, []byte("Hello, world!"), 0600)
+	// Minimal PNG header
+	os.WriteFile(imagePath, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, 0600)
+	// Minimal PDF header
+	os.WriteFile(pdfPath, []byte("%PDF-1.4\n"), 0600)
+	os.WriteFile(emptyPath, []byte{}, 0600)
+
+	tests := []struct {
+		name    string
+		path    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "Text file",
+			path:    textPath,
+			want:    "text/plain; charset=utf-8",
+			wantErr: false,
+		},
+		{
+			name:    "Image file",
+			path:    imagePath,
+			want:    "image/png",
+			wantErr: false,
+		},
+		{
+			name:    "PDF file",
+			path:    pdfPath,
+			want:    "application/pdf",
+			wantErr: false,
+		},
+		{
+			name:    "Empty file",
+			path:    emptyPath,
+			want:    "application/octet-stream",
+			wantErr: false,
+		},
+		{
+			name:    "Non-existent file",
+			path:    nonexistentPath,
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "Empty path",
+			path:    "",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "Root path",
+			path:    ".",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "Path too long",
+			path:    longPath,
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filesystem.GetMimeTypeFromContent(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetMimeTypeFromContent() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("GetMimeTypeFromContent() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
