@@ -3,6 +3,7 @@
 package performance
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -20,6 +21,23 @@ func MeasureExecutionTime(fn func()) time.Duration {
 	start := time.Now()
 	fn()
 	return time.Since(start)
+}
+
+// BenchmarkWrapper executes a function multiple times and returns the average execution time per iteration in nanoseconds.
+// If iterations is less than 1, it returns 0 and an error. If the wrapped function returns an error, it is propagated.
+func BenchmarkWrapper(fn func() error, iterations int) (float64, error) {
+	if iterations < 1 {
+		return 0, fmt.Errorf("iterations must be at least 1, got %d", iterations)
+	}
+	var total time.Duration
+	for i := 0; i < iterations; i++ {
+		start := time.Now()
+		if err := fn(); err != nil {
+			return 0, fmt.Errorf("function failed: %w", err)
+		}
+		total += time.Since(start)
+	}
+	return float64(total.Nanoseconds()) / float64(iterations), nil
 }
 
 // BenchmarkCSVMarshal benchmarks the csv.Marshal function.
