@@ -116,7 +116,7 @@ func Unmarshal(data []byte, dest any) error {
 // Returns:
 //   - error: An error if the path is invalid, the file is empty, or unmarshaling fails.
 func ReadFile(path string, dest any) error {
-	if err := fileio.ValidatePath(path, ".xml"); err != nil {
+	if err := fileio.ValidateReadPath(path, ".xml"); err != nil {
 		return err
 	}
 	data, err := os.ReadFile(path)
@@ -157,7 +157,7 @@ func ReadFile(path string, dest any) error {
 //   - error: An error if the path is invalid, data cannot be marshaled, directories cannot be created,
 //     or the file cannot be written.
 func WriteFile(data any, path string, perm ...os.FileMode) error {
-	if err := fileio.ValidatePath(path, ".xml"); err != nil {
+	if err := fileio.ValidateWritePath(path, ".xml"); err != nil {
 		return err
 	}
 	output, err := Marshal(data)
