@@ -400,7 +400,7 @@ func Url(input string, requireProtocol ...bool) (string, error) {
 		return "", errors.New("sanitized url is empty")
 	}
 	// Basic URL validation regex: optional protocol, host (alphanum.-), optional path (Unicode letters/numbers/_-./)
-	urlRegex := regexp.MustCompile(`^(https?://)?[a-zA-Z0-9.-]+(\.[a-zA-Z0-9.-]+)*(/[\p{L}\p{N}_./-]*)?$`)
+	urlRegex := regexp.MustCompile(`^(https?://)?[a-zA-Z0-9.-]+(\.[a-zA-Z0-9.-]+)*(/[\p{L}\p{N}_./-]*(\?[\p{L}\p{N}_./&=?-]*)?)?$`)
 	if !urlRegex.MatchString(result) {
 		return "", errors.New("invalid url format")
 	}

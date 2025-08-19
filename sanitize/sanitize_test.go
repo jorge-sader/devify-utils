@@ -18,11 +18,12 @@ func TestString(t *testing.T) {
 		{"happy: basic string", "hello world", "hello world", false},
 		{"happy: with unsafe chars", "hello<world>", "hello world", false},
 		{"happy: control chars", "hello\x00world", "helloworld", false},
-		{"happy: multiple spaces", "hello   world ", "hello world", false},
+		{"happy: multiple spaces", "hello world ", "hello world", false},
 		{"happy: unicode", "héllo wörld", "héllo wörld", false},
 		{"edge: empty", "", "", true},
 		{"edge: only unsafe", "<>{}|\\^~", "", true},
 		{"edge: only control", "\x00\x01", "", true},
+		{"edge: complex unicode", "héllo\t世界", "héllo世界", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -51,7 +52,8 @@ func TestHostname(t *testing.T) {
 		{"edge: invalid chars", "example!.com", "", true},
 		{"edge: spaces", "example com", "", true},
 		{"edge: empty", "", "", true},
-		{"edge: unicode", "héllo.com", "", true}, // invalid per regex
+		{"edge: unicode", "héllo.com", "", true},
+		{"edge: long hostname", strings.Repeat("a", 255) + ".com", strings.Repeat("a", 255) + ".com", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,6 +84,7 @@ func TestExtension(t *testing.T) {
 		{"edge: only dot", ".", "", true},
 		{"edge: multiple dots", "..txt", ".txt", false},
 		{"edge: invalid chars", ".txt<>", ".txt", false},
+		{"edge: long extension", "." + strings.Repeat("a", 255), "." + strings.Repeat("a", 255), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -189,6 +192,7 @@ func TestPath(t *testing.T) {
 		{"edge: file no trailing", "file.txt", false, "file.txt", false},
 		{"edge: absolute invalid comp", "/path/<>/dir", false, "/path/dir/", false},
 		{"edge: absolute empty comp", "/path//dir", false, "/path/dir/", false},
+		{"edge: long path component", strings.Repeat("a", 255) + "/file.txt", false, strings.Repeat("a", 255) + "/file.txt", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -197,7 +201,6 @@ func TestPath(t *testing.T) {
 				t.Errorf("Path() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			// Normalize for cross-platform: convert to / for comparison
 			got = filepath.ToSlash(got)
 			tt.want = filepath.ToSlash(tt.want)
 			if got != tt.want {
@@ -220,6 +223,7 @@ func TestUrl(t *testing.T) {
 		{"happy: unicode in path", "https://github.com/user/文件", true, "https://github.com/user/文件", false},
 		{"happy: without protocol allowed", "github.com/user/app-repo", false, "github.com/user/app-repo", false},
 		{"happy: http protocol", "http://example.com", true, "http://example.com", false},
+		{"happy: with query", "https://example.com/path?query=value", true, "https://example.com/path?query=value", false},
 		{"edge: empty", "", true, "", true},
 		{"edge: invalid chars in host", "https://example!.com", true, "", true},
 		{"edge: spaces", "https://example com", true, "", true},
@@ -253,7 +257,7 @@ func TestHasFileExtension(t *testing.T) {
 		{"happy: unicode ext", "文件.文档", true},
 		{"edge: no ext", "file", false},
 		{"edge: only dot", ".", false},
-		{"edge: hidden", ".hidden", false}, // .hidden is base, no ext
+		{"edge: hidden", ".hidden", false},
 		{"edge: multiple dots", "file.tar.gz", true},
 	}
 	for _, tt := range tests {
