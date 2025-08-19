@@ -42,27 +42,27 @@ var (
 	ErrIsDir = errors.New("path is a directory, not a file")
 )
 
-// ValidatePath checks if a file path is valid and has the expected file extension.
+// ValidateReadPath checks if a file path is valid for reading with the expected file extension.
 //
-// The function ensures the path is not empty, not too long, exists as a file (not a directory),
-// and has the specified file extension (e.g., ".csv"). It returns an error if any validation fails.
+// The function ensures the path is not empty or root, does not exceed 4096 characters, exists as a file (not a directory),
+// and has the specified file extension (e.g., ".yaml"). It returns an error if any validation fails, using predefined
+// error variables (ErrEmptyPath, ErrPathTooLong, ErrFileNotExist, ErrIsDir) or a custom error for extension mismatch.
 //
 // Example:
 //
-//	err := ValidatePath("data.csv", ".csv")
+//	err := ValidateReadPath("data.yaml", ".yaml")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}
-//	fmt.Println("Path is valid")
+//	fmt.Println("Path is valid for reading")
 //
 // Parameters:
-//   - path: The file path to validate.
-//   - ext: The expected file extension (e.g., ".csv").
+//   - path: The file path to validate for reading.
+//   - ext: The expected file extension (e.g., ".yaml").
 //
 // Returns:
-//   - error: An error if the path is empty, too long, does not exist, is a directory,
-//     or does not have the specified extension.
-func ValidatePath(path string, ext string) error {
+//   - error: An error if the path is empty, too long, does not exist, is a directory, or does not have the specified extension.
+func ValidateReadPath(path string, ext string) error {
 	if path == "" || path == "." {
 		return ErrEmptyPath
 	}
@@ -78,6 +78,40 @@ func ValidatePath(path string, ext string) error {
 	}
 	if info.IsDir() {
 		return ErrIsDir
+	}
+	if filepath.Ext(path) != ext {
+		return errors.New("file must have " + ext + " extension")
+	}
+	return nil
+}
+
+// ValidateWritePath checks if a file path is valid for writing with the expected file extension.
+//
+// The function ensures the path is not empty or root, does not exceed 4096 characters, and has the specified
+// file extension (e.g., ".yaml"). Unlike ValidateReadPath, it does not check if the file exists or is a directory,
+// as the file may not yet exist for writing. It returns an error if the path or extension is invalid, using predefined
+// error variables (ErrEmptyPath, ErrPathTooLong) or a custom error for extension mismatch.
+//
+// Example:
+//
+//	err := ValidateWritePath("output.yaml", ".yaml")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println("Path is valid for writing")
+//
+// Parameters:
+//   - path: The file path to validate for writing.
+//   - ext: The expected file extension (e.g., ".yaml").
+//
+// Returns:
+//   - error: An error if the path is empty, too long, or does not have the specified extension.
+func ValidateWritePath(path string, ext string) error {
+	if path == "" || path == "." {
+		return ErrEmptyPath
+	}
+	if len(path) > 4096 {
+		return ErrPathTooLong
 	}
 	if filepath.Ext(path) != ext {
 		return errors.New("file must have " + ext + " extension")
