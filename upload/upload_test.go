@@ -1,4 +1,4 @@
-package upload
+package upload_test
 
 import (
 	"bytes"
@@ -13,10 +13,11 @@ import (
 	"testing"
 
 	"github.com/devify-me/devify-utils/filesystem"
+	"github.com/devify-me/devify-utils/upload"
 	"github.com/go-playground/validator/v10"
 )
 
-func setupValidator(f *FileOperation) *validator.Validate {
+func setupValidator(f *upload.FileOperation) *validator.Validate {
 	v := validator.New(validator.WithRequiredStructEnabled())
 	v.RegisterValidation("allowedfiletype", f.IsAllowedFileType)
 	v.RegisterValidation("mime", func(fl validator.FieldLevel) bool {
@@ -53,10 +54,10 @@ func TestFileOperation_UploadFiles(t *testing.T) {
 	tempDir := t.TempDir()
 	uploadDir := filepath.Join(tempDir, "uploads")
 
-	f := &FileOperation{
+	f := &upload.FileOperation{
 		MaxFileSize:      10 << 20,
 		AllowedFileTypes: []string{"text/plain", "application/octet-stream"},
-		Validate:         setupValidator(&FileOperation{AllowedFileTypes: []string{"text/plain", "application/octet-stream"}}),
+		Validate:         setupValidator(&upload.FileOperation{AllowedFileTypes: []string{"text/plain", "application/octet-stream"}}),
 	}
 
 	tests := []struct {
@@ -110,6 +111,18 @@ func TestFileOperation_UploadFiles(t *testing.T) {
 			uploadDir: uploadDir,
 			wantErr:   "failed to validate uploaded file",
 		},
+		{
+			name:      "Unicode filename",
+			req:       createMultipartRequest(map[string]struct{ Content, Mime string }{"文件.txt": {Content: "content", Mime: "text/plain"}}),
+			uploadDir: uploadDir,
+			wantLen:   1,
+		},
+		{
+			name:      "Zero-sized file",
+			req:       createMultipartRequest(map[string]struct{ Content, Mime string }{"empty.txt": {Content: "", Mime: "text/plain"}}),
+			uploadDir: uploadDir,
+			wantLen:   1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -127,10 +140,19 @@ func TestFileOperation_UploadFiles(t *testing.T) {
 			if len(got) != tt.wantLen {
 				t.Errorf("UploadFiles() len = %v, want %v", len(got), tt.wantLen)
 			}
-			// Check files exist
 			for _, uf := range got {
 				if !filesystem.FileExists(uf.FullPath) {
 					t.Errorf("Uploaded file does not exist: %s", uf.FullPath)
+				}
+				if tt.rename {
+					if len(uf.EncodedName) != 32+len(filepath.Ext(uf.EncodedName)) {
+						t.Errorf("Renamed file %q does not have expected length", uf.EncodedName)
+					}
+				} else {
+					sanitized, err := filesystem.SanitizeFilename(uf.OriginalName)
+					if err != nil || uf.EncodedName != sanitized {
+						t.Errorf("Non-renamed file %q does not match sanitized original %q", uf.EncodedName, sanitized)
+					}
 				}
 			}
 		})
@@ -141,10 +163,10 @@ func TestFileOperation_UploadOneFile(t *testing.T) {
 	tempDir := t.TempDir()
 	uploadDir := filepath.Join(tempDir, "Uploads")
 
-	f := &FileOperation{
+	f := &upload.FileOperation{
 		MaxFileSize:      10 << 20,
 		AllowedFileTypes: []string{"text/plain", "application/octet-stream"},
-		Validate:         setupValidator(&FileOperation{AllowedFileTypes: []string{"text/plain", "application/octet-stream"}}),
+		Validate:         setupValidator(&upload.FileOperation{AllowedFileTypes: []string{"text/plain", "application/octet-stream"}}),
 	}
 
 	tests := []struct {
@@ -157,6 +179,16 @@ func TestFileOperation_UploadOneFile(t *testing.T) {
 		{
 			name:      "Single file",
 			req:       createMultipartRequest(map[string]struct{ Content, Mime string }{"test.txt": {Content: "content", Mime: "text/plain"}}),
+			uploadDir: uploadDir,
+		},
+		{
+			name:      "Unicode filename",
+			req:       createMultipartRequest(map[string]struct{ Content, Mime string }{"文件.txt": {Content: "content", Mime: "text/plain"}}),
+			uploadDir: uploadDir,
+		},
+		{
+			name:      "Zero-sized file",
+			req:       createMultipartRequest(map[string]struct{ Content, Mime string }{"empty.txt": {Content: "", Mime: "text/plain"}}),
 			uploadDir: uploadDir,
 		},
 		{
@@ -187,13 +219,15 @@ func TestFileOperation_UploadOneFile(t *testing.T) {
 			}
 			if got == nil {
 				t.Errorf("UploadOneFile() got nil")
+			} else if !filesystem.FileExists(got.FullPath) {
+				t.Errorf("Uploaded file does not exist: %s", got.FullPath)
 			}
 		})
 	}
 }
 
 func TestFileOperation_IsAllowedFileType(t *testing.T) {
-	f := &FileOperation{
+	f := &upload.FileOperation{
 		AllowedFileTypes: []string{"text/plain", "image/jpeg"},
 	}
 	v := setupValidator(f)
@@ -215,6 +249,11 @@ func TestFileOperation_IsAllowedFileType(t *testing.T) {
 		{
 			name:    "Not allowed type",
 			mime:    "application/octet-stream",
+			wantErr: true,
+		},
+		{
+			name:    "Empty type",
+			mime:    "",
 			wantErr: true,
 		},
 	}
