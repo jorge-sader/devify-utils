@@ -31,7 +31,7 @@ import (
 // Returns:
 //   - error: An error if the file cannot be read, the path is invalid, the file is empty, or the destination type is incorrect.
 func ReadFile(path string, dest any) error {
-	if err := fileio.ValidatePath(path, ".csv"); err != nil {
+	if err := fileio.ValidateReadPath(path, ".csv"); err != nil {
 		return err
 	}
 	file, err := os.Open(path)
@@ -77,7 +77,7 @@ func ReadFile(path string, dest any) error {
 // Returns:
 //   - error: An error if the path is invalid, data is empty or of incorrect type, directory creation fails, or writing fails.
 func WriteFile(data any, path string, perm ...os.FileMode) error {
-	if err := fileio.ValidatePath(path, ".csv"); err != nil {
+	if err := fileio.ValidateWritePath(path, ".csv"); err != nil {
 		return err
 	}
 	records, ok := data.([][]string)
