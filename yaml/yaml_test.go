@@ -134,6 +134,7 @@ func TestReadFile(t *testing.T) {
 	invalidExtPath := filepath.Join(tempDir, "test.txt")
 	dirPath := filepath.Join(tempDir, "dir")
 	emptyPath := filepath.Join(tempDir, "empty.yaml")
+	nonexistentPath := filepath.Join(tempDir, "nonexistent.yaml")
 	longPath := filepath.Join(tempDir, string(make([]rune, 4097)))
 
 	// Setup files
@@ -155,36 +156,43 @@ func TestReadFile(t *testing.T) {
 		{
 			name:    "Empty path",
 			path:    "",
+			dest:    &testStruct{},
 			wantErr: "path cannot be empty or root",
 		},
 		{
 			name:    "Root path",
 			path:    ".",
+			dest:    &testStruct{},
 			wantErr: "path cannot be empty or root",
 		},
 		{
 			name:    "Path too long",
 			path:    longPath,
+			dest:    &testStruct{},
 			wantErr: "path too long",
 		},
 		{
 			name:    "File not exist",
-			path:    filepath.Join(tempDir, "nonexistent.yaml"),
+			path:    nonexistentPath,
+			dest:    &testStruct{},
 			wantErr: "file does not exist",
 		},
 		{
 			name:    "Path is directory",
 			path:    dirPath,
+			dest:    &testStruct{},
 			wantErr: "path is a directory, not a file",
 		},
 		{
 			name:    "Invalid extension",
 			path:    invalidExtPath,
+			dest:    &testStruct{},
 			wantErr: "file must have .yaml or .yml extension",
 		},
 		{
 			name:    "Empty file",
 			path:    emptyPath,
+			dest:    &testStruct{},
 			wantErr: "file is empty",
 		},
 		{
@@ -210,6 +218,12 @@ func TestReadFile(t *testing.T) {
 			path:    malformedPath,
 			dest:    &testStruct{},
 			wantErr: "did not find expected key",
+		},
+		{
+			name:    "Nil destination",
+			path:    validYamlPath,
+			dest:    nil,
+			wantErr: "destination cannot be nil",
 		},
 	}
 

@@ -92,8 +92,8 @@ func Unmarshal(data []byte, dest any) error {
 // ReadFile reads a YAML file from the specified path and unmarshals it into the provided destination.
 //
 // The function validates that the file path has a ".yaml" or ".yml" extension, is not empty or root,
-// and does not exceed 4096 characters. It uses fileio.ValidatePath for additional path validation and checks
-// that the file is not empty before unmarshaling the data into the destination, which must be a non-nil
+// and does not exceed 4096 characters. It uses fileio.ValidateReadPath to ensure the file exists and is not a directory.
+// The file is checked for non-empty content before unmarshaling into the destination, which must be a non-nil
 // pointer to a struct, map, or other type supported by gopkg.in/yaml.v3.
 //
 // Example:
@@ -110,7 +110,7 @@ func Unmarshal(data []byte, dest any) error {
 //   - dest: A pointer to the destination where the parsed YAML data will be stored.
 //
 // Returns:
-//   - error: An error if the path is invalid, the file is empty, or unmarshaling fails.
+//   - error: An error if the path is invalid, the file is empty, the destination is nil, or unmarshaling fails.
 func ReadFile(path string, dest any) error {
 	if path == "" || path == "." {
 		return errors.New("path cannot be empty or root")
@@ -118,12 +118,15 @@ func ReadFile(path string, dest any) error {
 	if len(path) > 4096 {
 		return errors.New("path too long")
 	}
+	if dest == nil {
+		return errors.New("destination cannot be nil")
+	}
 	ext := filepath.Ext(path)
+	if err := fileio.ValidateReadPath(path, ext); err != nil {
+		return err
+	}
 	if ext != ".yaml" && ext != ".yml" {
 		return errors.New("file must have .yaml or .yml extension")
-	}
-	if err := fileio.ValidatePath(path, ext); err != nil {
-		return err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -138,10 +141,10 @@ func ReadFile(path string, dest any) error {
 // WriteFile serializes the given data to YAML and writes it to a file at the specified path.
 //
 // The function validates that the file path has a ".yaml" or ".yml" extension, is not empty or root,
-// and does not exceed 4096 characters. It uses fileio.EnsureDir to ensure parent directories exist and
-// marshals the data to YAML. The resulting bytes are written to the file with the specified permissions
-// (defaulting to 0600 if not provided). If the data cannot be marshaled or the file cannot be written,
-// an error is returned.
+// and does not exceed 4096 characters. It uses fileio.ValidateWritePath to ensure the path is valid for writing.
+// The data is marshaled to YAML, and parent directories are created using fileio.EnsureDir if needed.
+// The resulting bytes are written to the file with the specified permissions (defaulting to 0600 if not provided).
+// If the data cannot be marshaled or the file cannot be written, an error is returned.
 //
 // Example:
 //
@@ -169,6 +172,9 @@ func WriteFile(data any, path string, perm ...os.FileMode) error {
 	ext := filepath.Ext(path)
 	if ext != ".yaml" && ext != ".yml" {
 		return errors.New("file must have .yaml or .yml extension")
+	}
+	if err := fileio.ValidateWritePath(path, ext); err != nil {
+		return err
 	}
 	output, err := Marshal(data)
 	if err != nil {
